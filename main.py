@@ -3,7 +3,8 @@ import logging
 from aiogram import F, Bot, Dispatcher
 from core.handlers import register_handlers
 from core.database import init_db
-
+from dotenv import load_dotenv
+load_dotenv()
 # Логирование
 logging.basicConfig(
     level=logging.INFO,
@@ -21,13 +22,11 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 async def main():
-    # Инициализация БД
     init_db()
-    # Регистрация хэндлеров
-    register_handlers(dp)
-
+    await register_handlers(dp)  # 🟢 обязательно await!
     logger.info("Запуск бота...")
     await dp.start_polling(bot)
+
 
 if __name__ == '__main__':
     try:
