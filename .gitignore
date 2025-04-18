@@ -33,4 +33,4 @@ Thumbs.db
 .cache/
 *.egg-info/
 dist/
-build/
+build/.env
