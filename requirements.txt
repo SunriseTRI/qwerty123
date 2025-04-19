@@ -1,3 +1,6 @@
 aiogram
 python-dotenv
 pandas
+openpyxl
+nltk
+scikit-learn
