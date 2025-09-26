@@ -1,143 +1,201 @@
-
-
+import re
+import logging
 import numpy as np
+from difflib import SequenceMatcher
+from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import nltk
+from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
-import re
-from difflib import SequenceMatcher
-from fuzzywuzzy import fuzz
+import nltk
 
-# =========================
-# Настройки поиска (можно редактировать)
-# =========================
+# ==========================
+# NLP Настройки и инициализация
+# ==========================
+nltk.download('stopwords')
+STEMMER = SnowballStemmer("russian")
+STOPWORDS = set(stopwords.words("russian"))
 
-# Порог схожести для TF-IDF (0.0–1.0)
-TFIDF_THRESHOLD = 0.3  # если хотите более "мягкий" поиск, уменьшите до 0.3
+# ==========================
+# Настройки поиска
+# ==========================
+# Каждый порог можно менять для настройки чувствительности
+TFIDF_THRESHOLD = 0.5      # Косинусная схожесть TF-IDF, 0.0-1.0 (чем выше, тем строже)
+FUZZY_THRESHOLD = 70        # Fuzzy matching, 0-100 (чем выше, тем строже)
+SEQUENCE_THRESHOLD = 0.3    # SequenceMatcher, 0.0-1.0
+SUBWORD_THRESHOLD = 0.3     # Частичная подсловная схожесть
+LEVENSHTEIN_THRESHOLD = 2   # Максимальное расстояние редактирования
+JACCARD_THRESHOLD = 0.3     # Jaccard similarity, 0.0-1.0
+# EMBBEDDING_THRESHOLD = 0.5 # (если будем добавлять семантический поиск)
+# PHONETIC_THRESHOLD = 0.5   # (если будем добавлять фонетику)
 
-# Порог схожести для fuzzy (0–100)
-FUZZY_THRESHOLD = 50  # 100 — строгое совпадение, 50 — допускает опечатки
+TOP_N_RESULTS = 5           # Количество результатов для отображения пользователю
 
-# Порог схожести по символам/частям слов (0.0–1.0)
-CHAR_THRESHOLD = 0.55  # чем ниже — тем больше шансов найти кривой ввод
-
-# Максимальное число результатов
-TOP_N_RESULTS = 5
-
-
-# =========================
-# NLP подготовка
-# =========================
-
-nltk.download('stopwords', quiet=True)
-stemmer = SnowballStemmer("russian")
-stop_words = set(stopwords.words("russian"))
-
+# ==========================
+# Препроцессинг
+# ==========================
 def preprocess_text(text: str) -> str:
-    """
-    Преобразует текст: приведение к нижнему регистру,
-    удаление пунктуации, стемминг и удаление стоп-слов.
-    """
+    """Приводит текст к нижнему регистру, убирает пунктуацию, стоп-слова и стеммит слова"""
     text = text.lower()
     text = re.sub(r'[^\w\s]', '', text)
     words = text.split()
-    words = [stemmer.stem(word) for word in words if word not in stop_words]
+    words = [STEMMER.stem(word) for word in words if word not in STOPWORDS]
     return ' '.join(words)
 
-# =========================
-# Класс FAQEngine
-# =========================
-
-class FAQEngine:
-    def __init__(self):
-        self.vectorizer = None
-        self.faq_vectors = None
-        self.faq_questions = []
-
-    def fit(self, questions: list[str]):
-        self.faq_questions = questions
-        if questions:
-            processed_questions = [preprocess_text(q) for q in questions]
-            self.vectorizer = TfidfVectorizer()
-            self.faq_vectors = self.vectorizer.fit_transform(processed_questions)
-
-faq_engine = FAQEngine()
-
-# =========================
-# Основная функция поиска
-# =========================
-
-def find_similar_questions(user_question: str, faq_questions: list[str],
-                           threshold: float = None,  # для совместимости со старым кодом
-                           tfidf_threshold: float = None,
-                           fuzzy_threshold: int = None,
-                           char_threshold: float = None,
-                           top_n: int = None):
-    """
-    Ищет похожие вопросы в базе FAQ.
-    Использует комбинированный подход:
-    1) TF-IDF косинусная схожесть
-    2) fuzzy string matching
-    3) совпадение символов / частей слов (SequenceMatcher)
-    """
-    # =========================
-    # Подготовка порогов и top_n
-    # =========================
-    tfidf_threshold = tfidf_threshold if tfidf_threshold is not None else (threshold if threshold is not None else TFIDF_THRESHOLD)
-    fuzzy_threshold = fuzzy_threshold if fuzzy_threshold is not None else FUZZY_THRESHOLD
-    char_threshold = char_threshold if char_threshold is not None else CHAR_THRESHOLD
-    top_n = top_n if top_n is not None else TOP_N_RESULTS
-
+# ==========================
+# Методы поиска
+# ==========================
+def tfidf_search(user_question: str, faq_questions: list[str]):
+    """Поиск с помощью TF-IDF + косинусная схожесть"""
     if not faq_questions:
         return []
+    processed_questions = [preprocess_text(q) for q in faq_questions]
+    vectorizer = TfidfVectorizer()
+    faq_vectors = vectorizer.fit_transform(processed_questions)
+    user_vector = vectorizer.transform([preprocess_text(user_question)])
+    similarities = cosine_similarity(user_vector, faq_vectors)[0]
+    results = [(faq_questions[i], sim) for i, sim in enumerate(similarities) if sim >= TFIDF_THRESHOLD]
+    logging.info(f"[TF-IDF] Найдено {len(results)} совпадений")
+    return results
 
-    # =========================
-    # Подготовка векторов TF-IDF
-    # =========================
-    faq_engine.fit(faq_questions)
-    processed_user = preprocess_text(user_question)
-    user_vector = faq_engine.vectorizer.transform([processed_user])
-    similarities = cosine_similarity(user_vector, faq_engine.faq_vectors)[0]
-
-    # =========================
-    # Первый уровень: TF-IDF
-    # =========================
-    tfidf_results = []
-    for idx, score in enumerate(similarities):
-        if score >= tfidf_threshold:
-            tfidf_results.append((faq_questions[idx], score))
-
-    if tfidf_results:
-        tfidf_results.sort(key=lambda x: x[1], reverse=True)
-        return tfidf_results[:top_n]
-
-    # =========================
-    # Второй уровень: fuzzy
-    # =========================
-    fuzzy_results = []
+def fuzzy_search(user_question: str, faq_questions: list[str]):
+    """Поиск по Fuzzy string matching"""
+    results = []
     for q in faq_questions:
-        score = fuzz.token_set_ratio(user_question.lower(), q.lower())
-        if score >= fuzzy_threshold:
-            fuzzy_results.append((q, score / 100.0))
-    if fuzzy_results:
-        fuzzy_results.sort(key=lambda x: x[1], reverse=True)
-        return fuzzy_results[:top_n]
+        score = fuzz.token_set_ratio(user_question, q)
+        if score >= FUZZY_THRESHOLD:
+            results.append((q, score / 100))
+    logging.info(f"[Fuzzy] Найдено {len(results)} совпадений")
+    return results
 
-    # =========================
-    # Третий уровень: совпадение символов / частей слов
-    # =========================
-    char_results = []
+def sequence_search(user_question: str, faq_questions: list[str]):
+    """Поиск по SequenceMatcher (частичная схожесть символов)"""
+    results = []
     for q in faq_questions:
-        score = SequenceMatcher(None, user_question.lower(), q.lower()).ratio()
-        if score >= char_threshold:
-            char_results.append((q, score))
-    if char_results:
-        char_results.sort(key=lambda x: x[1], reverse=True)
-        return char_results[:top_n]
+        score = SequenceMatcher(None, user_question, q).ratio()
+        if score >= SEQUENCE_THRESHOLD:
+            results.append((q, score))
+    logging.info(f"[SequenceMatcher] Найдено {len(results)} совпадений")
+    return results
 
-    # =========================
-    # Если ничего не найдено
-    # =========================
-    return []
+def subword_search(user_question: str, faq_questions: list[str]):
+    """Подсловный поиск: проверка совпадений подстрок"""
+    results = []
+    uq = preprocess_text(user_question)
+    for q in faq_questions:
+        pq = preprocess_text(q)
+        words_u = set(uq.split())
+        words_q = set(pq.split())
+        if not words_u:
+            continue
+        overlap = len(words_u & words_q) / len(words_u)
+        if overlap >= SUBWORD_THRESHOLD:
+            results.append((q, overlap))
+    logging.info(f"[Subword] Найдено {len(results)} совпадений")
+    return results
+
+def levenshtein_search(user_question: str, faq_questions: list[str]):
+    """Поиск по расстоянию Левенштейна"""
+    def levenshtein_distance(s1, s2):
+        if s1 == s2:
+            return 0
+        if len(s1) == 0:
+            return len(s2)
+        if len(s2) == 0:
+            return len(s1)
+        prev_row = range(len(s2) + 1)
+        for i, c1 in enumerate(s1):
+            curr_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                insertions = prev_row[j + 1] + 1
+                deletions = curr_row[j] + 1
+                substitutions = prev_row[j] + (c1 != c2)
+                curr_row.append(min(insertions, deletions, substitutions))
+            prev_row = curr_row
+        return prev_row[-1]
+
+    results = []
+    for q in faq_questions:
+        dist = levenshtein_distance(user_question.lower(), q.lower())
+        if dist <= LEVENSHTEIN_THRESHOLD:
+            results.append((q, 1 - dist / max(len(user_question), len(q))))
+    logging.info(f"[Levenshtein] Найдено {len(results)} совпадений")
+    return results
+
+def jaccard_search(user_question: str, faq_questions: list[str]):
+    """Поиск по Jaccard similarity (overlap слов)"""
+    uq_set = set(preprocess_text(user_question).split())
+    results = []
+    for q in faq_questions:
+        fq_set = set(preprocess_text(q).split())
+        if not uq_set:
+            continue
+        overlap = len(uq_set & fq_set) / len(uq_set)
+        if overlap >= JACCARD_THRESHOLD:
+            results.append((q, overlap))
+    logging.info(f"[Jaccard] Найдено {len(results)} совпадений")
+    return results
+
+# ==========================
+# Основная функция поиска
+# ==========================
+def find_similar_questions(user_question: str, faq_questions: list[str]):
+    """
+    Главная функция поиска. Использует все методы по очереди.
+    Возвращает список: [(вопрос, средняя_оценка), ...] отсортированный по релевантности.
+    """
+    all_results = []
+
+    # 1. TF-IDF
+    all_results.extend(tfidf_search(user_question, faq_questions))
+
+    # 2. Fuzzy
+    all_results.extend(fuzzy_search(user_question, faq_questions))
+
+    # 3. SequenceMatcher
+    all_results.extend(sequence_search(user_question, faq_questions))
+
+    # 4. Subword
+    all_results.extend(subword_search(user_question, faq_questions))
+
+    # 5. Levenshtein
+    all_results.extend(levenshtein_search(user_question, faq_questions))
+
+    # 6. Jaccard
+    all_results.extend(jaccard_search(user_question, faq_questions))
+
+    # ==========================
+    # Комбинируем результаты
+    # ==========================
+    # Считаем среднюю оценку для каждого вопроса, встречающегося в разных методах
+    counter = {}
+    scores = {}
+    for q, score in all_results:
+        if q not in counter:
+            counter[q] = 0
+            scores[q] = []
+        counter[q] += 1
+        scores[q].append(score)
+
+    # Средняя оценка
+    combined_results = [(q, sum(scores[q]) / len(scores[q]), counter[q]) for q in counter]
+
+    # Сортировка: сначала по количеству совпадений (чем чаще встречался), потом по средней оценке
+    combined_results.sort(key=lambda x: (x[2], x[1]), reverse=True)
+
+    # Логирование
+    logging.info(f"[Combined] Всего кандидатов: {len(combined_results)}")
+    for q, avg, count in combined_results[:TOP_N_RESULTS]:
+        logging.info(f"Вопрос: {q}, Средняя оценка: {avg:.2f}, Методов: {count}")
+
+    return combined_results[:TOP_N_RESULTS]
+
+# ==========================
+# Функция для ручного добавления вопросов в unanswered
+# ==========================
+unanswered_questions = []
+
+def add_unanswered_question(user_question: str):
+    unanswered_questions.append(user_question)
+    logging.info(f"[Unanswered] Добавлен вопрос: {user_question}")

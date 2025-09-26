@@ -143,87 +143,11 @@ async def create_ticket_handler(message: Message):
     """Заглушка: создание задачи"""
     await message.answer("🎫 Функция создания задачи в разработке...")
 
-# async def faq_handler(message: Message, state: FSMContext):
-#     """Обработчик обычного текста для FAQ"""
-#     if message.text in ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]:
-#         return  # Эти сообщения обрабатываются другими хендлерами
-#
-#     if not is_user_registered(message.from_user.id):
-#         await message.answer("❌ Сначала пройдите регистрацию!", reply_markup=CONTACT_KB)
-#         return
-#
-#     user_question = message.text.strip()
-#     faq_questions = get_all_faq_questions()
-#
-#     if not faq_questions:
-#         await message.answer("⚠️ База знаний пуста. Ожидайте ответа от оператора.")
-#         return
-#
-#     similar = find_similar_questions(user_question, faq_questions)
-#
-#     if similar:
-#         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-#         for q, _ in similar:
-#             question_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
-#             keyboard.inline_keyboard.append(
-#                 [InlineKeyboardButton(text=q[:64], callback_data=f"faq:{question_hash}")]
-#             )
-#         await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
-#     else:
-#         insert_faq_question(user_question)
-#         log_unanswered_question(user_question)
-#         await message.answer("📝 Вопрос передан специалистам. Мы ответим вам в ближайшее время!")
-
-# async def faq_handler(message: Message, state: FSMContext):
-#     """Обработчик обычного текста для FAQ"""
-#     # Игнорируем системные кнопки, обрабатываются другими хендлерами
-#     if message.text in ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]:
-#         return
-#
-#     # Проверяем регистрацию пользователя
-#     if not is_user_registered(message.from_user.id):
-#         await message.answer("❌ Сначала пройдите регистрацию!", reply_markup=CONTACT_KB)
-#         return
-#
-#     user_question = message.text.strip()
-#     faq_questions = get_all_faq_questions()
-#
-#     if not faq_questions:
-#         await message.answer("⚠️ База знаний пуста. Ожидайте ответа от оператора.")
-#         return
-#
-#     # ===============================
-#     # Основной вызов поиска вопросов
-#     # ===============================
-#     # Теперь threshold и чувствительность всех методов управленияются из nlp_utils.py
-#     similar = find_similar_questions(user_question, faq_questions)
-#
-#     if similar:
-#         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-#         for item in similar:
-#             # Если каждый элемент — словарь с ключами 'question' и 'score'
-#             q = item['question']
-#             question_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
-#             keyboard.inline_keyboard.append(
-#                 [InlineKeyboardButton(text=q[:64], callback_data=f"faq:{question_hash}")]
-#             )
-#         await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
-#
-#     else:
-#         # Если ничего не найдено, сохраняем вопрос и логируем для ручной обработки
-#         insert_faq_question(user_question)
-#         log_unanswered_question(user_question)
-#         await message.answer("📝 Вопрос передан специалистам. Мы ответим вам в ближайшее время!")
-#
 async def faq_handler(message: Message, state: FSMContext):
-    """Обработчик обычного текста для FAQ с новым NLP"""
+    """Обработчик обычного текста для FAQ"""
+    if message.text in ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]:
+        return  # Эти сообщения обрабатываются другими хендлерами
 
-    # Игнорируем служебные кнопки
-    skip_texts = ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]
-    if message.text in skip_texts:
-        return
-
-    # Проверка регистрации
     if not is_user_registered(message.from_user.id):
         await message.answer("❌ Сначала пройдите регистрацию!", reply_markup=CONTACT_KB)
         return
@@ -235,33 +159,20 @@ async def faq_handler(message: Message, state: FSMContext):
         await message.answer("⚠️ База знаний пуста. Ожидайте ответа от оператора.")
         return
 
-    # Получаем похожие вопросы
-    similar = find_similar_questions(user_question, faq_questions)
-    # similar = [(question, avg_score, methods_count), ...]
+    similar = find_similar_questions(user_question, faq_questions, threshold=0.4)
 
     if similar:
-        # Сортируем по средней оценке
-        similar.sort(key=lambda x: x[1], reverse=True)
-
         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-        for item in similar:
-            q = item[0]            # вопрос
-            avg_score = item[1]    # средняя оценка
-            methods_count = item[2]# число методов, которые нашли совпадение
-
+        for q, _ in similar:
             question_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
             keyboard.inline_keyboard.append(
-                [InlineKeyboardButton(text=f"{q[:64]} ({avg_score:.2f})", callback_data=f"faq:{question_hash}")]
+                [InlineKeyboardButton(text=q[:64], callback_data=f"faq:{question_hash}")]
             )
-
         await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
     else:
-        # Сохраняем в базу для ручной обработки
         insert_faq_question(user_question)
         log_unanswered_question(user_question)
         await message.answer("📝 Вопрос передан специалистам. Мы ответим вам в ближайшее время!")
-
-
 
 async def process_faq_choice(callback: CallbackQuery):
     """Обработчик выбора варианта FAQ по inline кнопке"""
