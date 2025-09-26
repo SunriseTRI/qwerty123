@@ -1,28 +1,37 @@
-# Byte-compiled / caches
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
+*.so
+*.db
 
-# Virtualenv
-venv/
-.env
-.env/
+# venv
 .venv/
+env/
+venv/
 
-# PyCharm
+# IDE
 .idea/
-*.iml
+.vscode/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Build / dist
-build/
-dist/
-*.egg-info/
-
-# Logs, DBs
+# Logs
 *.log
-*.sqlite3
-*.db
+
+# Environment
+.env
+
+# Bytecode and backup
+*.bak
+*.swp
+*.swo
+
+# Cache
+.cache/
+*.egg-info/
+dist/
+build/.env
