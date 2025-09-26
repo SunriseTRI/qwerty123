@@ -1,3 +1,4 @@
+from core.keyboards import get_main_menu_keyboard
 from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -23,49 +24,6 @@ async def process_name(message: types.Message, state: FSMContext):
     await message.answer("Введите номер телефона (+XXXXXXXXXXX):")
     await state.set_state(RegistrationStates.waiting_for_phone)
 
-
-# async def process_phone(message: types.Message, state: FSMContext):
-#     if not re.match(PHONE_REGEX, message.text):
-#         return await message.answer("Неверный формат. Попробуйте ещё раз:")
-#
-#     data = await state.get_data()
-#     name = data.get('name', '')
-#     phone = message.text
-#     user = message.from_user
-#
-#     insert_user(
-#         user_id=user.id,
-#         username=user.username or '',
-#         phone=phone,
-#         full_name=name
-#     )
-#
-#     await message.answer(f"Регистрация завершена, {name}!")
-#     await state.clear()
-# #
-# async def process_phone(message: types.Message, state: FSMContext):
-#     if not re.match(PHONE_REGEX, message.text):
-#         return await message.answer("Неверный формат. Попробуйте ещё раз:")
-#
-#     data = await state.get_data()
-#     name = data.get('name', '')
-#     phone = message.text
-#     user = message.from_user
-#
-#     insert_user(
-#         user_id=user.id,
-#         username=user.username or '',
-#         phone=phone,
-#         full_name=name
-#     )
-#
-#     await message.answer(
-#         f"✅ Регистрация завершена, {name}!",
-#         reply_markup=MAIN_MENU_KB  # Показываем основное меню
-#     )
-#     await state.clear()
-
-#++++
 
 async def process_phone(message: types.Message, state: FSMContext):
     if not re.match(PHONE_REGEX, message.text):

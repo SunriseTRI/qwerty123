@@ -19,18 +19,7 @@ def preprocess_text(text: str) -> str:
     return ' '.join(words)
 
 
-# def find_similar_questions(user_question: str, faq_questions: list, threshold=0.5, top_n=3):
-#     if not faq_questions:
-#         return []
-#
-#     processed_user = preprocess_text(user_question)
-#     processed_faq = [preprocess_text(q) for q in faq_questions]
-#
-#     vectorizer = TfidfVectorizer()
-#     vectors = vectorizer.fit_transform([processed_user] + processed_faq)
-#
-#     cosine_matrix = cosine_similarity(vectors[0:1], vectors[1:])
-#     similarities = cosine_matrix[0]
+
 
 class FAQEngine:
     def __init__(self):
@@ -47,9 +36,10 @@ class FAQEngine:
 
 faq_engine = FAQEngine()
 
-def find_similar_questions(user_question: str, threshold=0.5, top_n=3):
-    if not faq_engine.faq_questions:
+def find_similar_questions(user_question: str, faq_questions: list[str], threshold=0.5, top_n=3):
+    if not faq_questions:
         return []
+    faq_engine.fit(faq_questions)  # <- добавляем чтобы каждый раз пересчитывать
     processed_user = preprocess_text(user_question)
     user_vector = faq_engine.vectorizer.transform([processed_user])
     similarities = cosine_similarity(user_vector, faq_engine.faq_vectors)[0]
@@ -58,5 +48,4 @@ def find_similar_questions(user_question: str, threshold=0.5, top_n=3):
     for idx in sorted_indices:
         if similarities[idx] >= threshold:
             results.append((faq_questions[idx], similarities[idx]))
-
     return results[:top_n]

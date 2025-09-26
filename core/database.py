@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'bot_data.db')
 
 
+
+
 def generate_question_hash(question: str) -> str:
     return hashlib.sha256(question.encode()).hexdigest()[:16]
 
@@ -113,12 +115,6 @@ def log_unanswered_question(question: str):
         conn.commit()
 
 
-# def get_faq_answer(question: str):
-#     with sqlite3.connect(DB_PATH) as conn:
-#         cur = conn.cursor()
-#         cur.execute("SELECT answer FROM faq WHERE question = ?", (question,))
-#         row = cur.fetchone()
-#         return row[0] if row else None
 def get_faq_answer(question: str) -> str | None:
     try:
         with sqlite3.connect(DB_PATH) as conn:
@@ -156,3 +152,33 @@ def insert_user(user_id: int, username: str, phone: str, full_name: str):
             (user_id, username, phone, full_name)
         )
         conn.commit()
+
+
+# novoe
+def insert_user(user_id: int, username: str, phone: str, full_name: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT OR REPLACE INTO users (user_id, username, phone, full_name) VALUES (?, ?, ?, ?)",
+            (user_id, username, phone, full_name)
+        )
+        conn.commit()
+
+def is_user_registered(user_id: int) -> bool:
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+        return cur.fetchone() is not None
+
+def insert_faq_question(question: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("INSERT INTO unanswered_questions (question) VALUES (?)", (question,))
+        conn.commit()
+
+def get_faq_answer(question: str) -> str:
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT answer FROM faq WHERE question = ?", (question,))
+        row = cur.fetchone()
+        return row[0] if row else "Ответ пока не найден"
