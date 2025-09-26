@@ -113,13 +113,22 @@ def log_unanswered_question(question: str):
         conn.commit()
 
 
-def get_faq_answer(question: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT answer FROM faq WHERE question = ?", (question,))
-        row = cur.fetchone()
-        return row[0] if row else None
-
+# def get_faq_answer(question: str):
+#     with sqlite3.connect(DB_PATH) as conn:
+#         cur = conn.cursor()
+#         cur.execute("SELECT answer FROM faq WHERE question = ?", (question,))
+#         row = cur.fetchone()
+#         return row[0] if row else None
+def get_faq_answer(question: str) -> str | None:
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT answer FROM faq WHERE question = ?", (question,))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except sqlite3.Error as e:
+        logging.error(f"Database error in get_faq_answer: {e}")
+        return None
 
 def insert_faq_question(question: str):
     question_hash = generate_question_hash(question)

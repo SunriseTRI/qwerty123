@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="com.obiscr.chatgpt.settings.EasyCodeState">
+    <option name="projectFiles" value="$PROJECT_DIR$/core/database.py;C:/Users/Stas/Desktop/mbot-main/core/generator.py;C:/Users/Stas/Desktop/mbot-main/core/handlers.py;C:/Users/Stas/Desktop/mbot-main/core/nlp_utils.py;C:/Users/Stas/Desktop/mbot-main/core/okdesk_integration.py;C:/Users/Stas/Desktop/mbot-main/core/registration.py;C:/Users/Stas/Desktop/mbot-main/for test.py;C:/Users/Stas/Desktop/mbot-main/main.py;C:/Users/Stas/Desktop/mbot-main/readme.md;C:/Users/Stas/Desktop/mbot-main/~$readme.md" />
+  </component>
+</project>
