@@ -21,11 +21,11 @@ STOPWORDS = set(stopwords.words("russian"))
 # Настройки поиска
 # ==========================
 # Каждый порог можно менять для настройки чувствительности
-TFIDF_THRESHOLD = 0.5      # Косинусная схожесть TF-IDF, 0.0-1.0 (чем выше, тем строже)
-FUZZY_THRESHOLD = 70        # Fuzzy matching, 0-100 (чем выше, тем строже)
-SEQUENCE_THRESHOLD = 0.3    # SequenceMatcher, 0.0-1.0
-SUBWORD_THRESHOLD = 0.3     # Частичная подсловная схожесть
-LEVENSHTEIN_THRESHOLD = 2   # Максимальное расстояние редактирования
+TFIDF_THRESHOLD = 0.4      # Косинусная схожесть TF-IDF, 0.0-1.0 (чем выше, тем строже)
+FUZZY_THRESHOLD = 60        # Fuzzy matching, 0-100 (чем выше, тем строже)
+SEQUENCE_THRESHOLD = 0.25    # SequenceMatcher, 0.0-1.0
+SUBWORD_THRESHOLD = 0.25     # Частичная подсловная схожесть
+LEVENSHTEIN_THRESHOLD = 3   # Максимальное расстояние редактирования
 JACCARD_THRESHOLD = 0.3     # Jaccard similarity, 0.0-1.0
 # EMBBEDDING_THRESHOLD = 0.5 # (если будем добавлять семантический поиск)
 # PHONETIC_THRESHOLD = 0.5   # (если будем добавлять фонетику)
