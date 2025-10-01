@@ -29,7 +29,8 @@ def init_db():
                         user_id INTEGER PRIMARY KEY,
                         username TEXT,
                         phone TEXT,
-                        full_name TEXT
+                        full_name TEXT,
+                        questions_table TEXT
                     )''')
         cur.execute('''CREATE TABLE IF NOT EXISTS faq (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -182,3 +183,64 @@ def get_faq_answer(question: str) -> str:
         cur.execute("SELECT answer FROM faq WHERE question = ?", (question,))
         row = cur.fetchone()
         return row[0] if row else "Ответ пока не найден"
+
+def create_user_questions_table(user_identifier: str) -> str:
+    """Создаёт отдельную таблицу для вопросов пользователя"""
+    table_name = f"user_questions_{user_identifier}"
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(f'''CREATE TABLE IF NOT EXISTS {table_name} (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            question TEXT,
+                            answer TEXT,
+                            status TEXT CHECK(status IN ('green','yellow','red')) DEFAULT 'yellow',
+                            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )''')
+        conn.commit()
+    return table_name
+
+
+def add_user_question(user_id: int, question: str, answer: str | None = None, status: str = "yellow"):
+    """Добавляем вопрос в личную таблицу пользователя"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        # получаем имя таблицы
+        cur.execute("SELECT questions_table FROM users WHERE user_id = ?", (user_id,))
+        row = cur.fetchone()
+        if not row or not row[0]:
+            identifier = str(user_id)
+            table_name = create_user_questions_table(identifier)
+            cur.execute("UPDATE users SET questions_table = ? WHERE user_id = ?", (table_name, user_id))
+        else:
+            table_name = row[0]
+
+        cur.execute(f"INSERT INTO {table_name} (question, answer, status) VALUES (?, ?, ?)",
+                    (question, answer, status))
+        conn.commit()
+
+
+def get_user_questions(user_id: int):
+    """Возвращает все вопросы пользователя с цветом статуса"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT questions_table FROM users WHERE user_id = ?", (user_id,))
+        row = cur.fetchone()
+        if not row or not row[0]:
+            return []
+        table_name = row[0]
+        cur.execute(f"SELECT id, question, answer, status FROM {table_name}")
+        return cur.fetchall()
+
+
+def delete_user_question(user_id: int, question_id: int):
+    """Удаляет вопрос только из таблицы пользователя"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT questions_table FROM users WHERE user_id = ?", (user_id,))
+        row = cur.fetchone()
+        if not row or not row[0]:
+            return False
+        table_name = row[0]
+        cur.execute(f"DELETE FROM {table_name} WHERE id = ?", (question_id,))
+        conn.commit()
+        return True
