@@ -1,35 +1,16 @@
 from aiogram import F
-from aiogram.types import (
-    Message,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery
-)
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.dispatcher.dispatcher import Dispatcher
 import logging
 import hashlib
-
-from .database import (
-    get_faq_answer,
-    insert_faq_question,
-    is_user_registered,
-    insert_user,
-    get_all_faq_questions,
-    log_unanswered_question,
-    get_question_by_hash
-)
-
+from .database import get_faq_answer,insert_faq_question,is_user_registered,insert_user,get_all_faq_questions,log_unanswered_question,get_question_by_hash
 from .registration import start_registration, process_name, process_phone, RegistrationStates
 from .nlp_utils import find_similar_questions
 from core.keyboards import get_main_menu_keyboard
 
-# ====================
 # Кнопки
-# ====================
 
 CONTACT_KB = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text="Поделиться контактом", request_contact=True)]],
@@ -39,8 +20,9 @@ CONTACT_KB = ReplyKeyboardMarkup(
 
 MAIN_MENU_KB = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="❓ HELP"), KeyboardButton(text="📋 MENU")],
-        [KeyboardButton(text="💬 Задать вопрос")]
+
+        [KeyboardButton(text="📥 Выгрузка FAQ"), KeyboardButton(text="📖 Инструкция")],
+        [KeyboardButton(text="🎫 Создать задачу"), KeyboardButton(text="❓ HELP"), KeyboardButton(text="◀️ Назад")]
     ],
     resize_keyboard=True,
     persistent=True
@@ -55,9 +37,7 @@ MENU_OPTIONS_KB = ReplyKeyboardMarkup(
     persistent=True
 )
 
-# ====================
 # Основные функции
-# ====================
 
 async def cmd_start(message: Message):
     if is_user_registered(message.from_user.id):
@@ -79,8 +59,27 @@ async def cmd_start(message: Message):
 async def handle_faq(message: Message):
     await message.answer("Здесь будет выгрузка FAQ.")
 
+
+INSTRUCTION_TEXT = (
+    "🤖✨ Привет! FAQ бот-помощник ауф\n\n"
+    "Вот как со мной общаться:\n"
+    "1️⃣ Пиши вопрос обычным человеческим языком.\n"
+    "👉 Пример: 'Как обновить устройство?'\n"
+    "2️⃣ Я ищу ответ по 🔍 базе знаний и FAQ.\n"
+    "– Если нахожу похожее → покажу варианты.\n"
+    "– Если не нахожу → тыкай кнопку ❌ 'Нет ответа' и вопрос уйдёт в базу.\n"
+    "3️⃣ Выбирай самый подходящий вариант ответа 👍\n\n"
+    "⚡ Важно:\n"
+    "– Чем понятнее вопрос → тем точнее ответ.\n"
+    "– Если текст ответа длинный, я его сокращу и покажу рейтинг (📊0.87*5).\n\n"
+    "- 🧠 Ещё у меня есть память! Все твои вопросы, на которые я не нашёл ответ, "
+    "я сохраняю в твоём профиле. Потом можешь зайти, посмотреть и гордиться, что ты умнее пары строк кода и алгоритмов 😎 "
+    "\n\n🎉 Всё, больше думать не надо! Жми кнопки, смотри ответы и кайфуй 🕺💃"
+)
+
+
 async def handle_instruction(message: Message):
-    await message.answer("Здесь будет инструкция.")
+    await message.answer(INSTRUCTION_TEXT)
 
 async def handle_create_task(message: Message):
     await message.answer("Функция создания задачи пока в разработке.")
@@ -102,12 +101,14 @@ async def contact_handler(message: Message, state: FSMContext):
             "Теперь вы можете пользоваться всеми функциями бота. "
             "Выберите опцию из меню ниже или просто задайте вопрос."
         )
+
         await message.answer(
             welcome_text,
-            reply_markup=get_main_menu_keyboard(),
+            reply_markup=MAIN_MENU_KB,
             parse_mode="Markdown"
         )
         await state.clear()
+
 
 async def help_handler(message: Message):
     """Обработчик кнопки HELP"""
@@ -131,7 +132,7 @@ async def menu_handler(message: Message):
 async def back_to_main_menu(message: Message):
     """Возврат в главное меню"""
     await message.answer(
-        "Главное меню:",
+        "Профиль пользователя:",
         reply_markup=MAIN_MENU_KB
     )
 
@@ -143,87 +144,14 @@ async def create_ticket_handler(message: Message):
     """Заглушка: создание задачи"""
     await message.answer("🎫 Функция создания задачи в разработке...")
 
-# async def faq_handler(message: Message, state: FSMContext):
-#     """Обработчик обычного текста для FAQ"""
-#     if message.text in ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]:
-#         return  # Эти сообщения обрабатываются другими хендлерами
-#
-#     if not is_user_registered(message.from_user.id):
-#         await message.answer("❌ Сначала пройдите регистрацию!", reply_markup=CONTACT_KB)
-#         return
-#
-#     user_question = message.text.strip()
-#     faq_questions = get_all_faq_questions()
-#
-#     if not faq_questions:
-#         await message.answer("⚠️ База знаний пуста. Ожидайте ответа от оператора.")
-#         return
-#
-#     similar = find_similar_questions(user_question, faq_questions)
-#
-#     if similar:
-#         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-#         for q, _ in similar:
-#             question_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
-#             keyboard.inline_keyboard.append(
-#                 [InlineKeyboardButton(text=q[:64], callback_data=f"faq:{question_hash}")]
-#             )
-#         await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
-#     else:
-#         insert_faq_question(user_question)
-#         log_unanswered_question(user_question)
-#         await message.answer("📝 Вопрос передан специалистам. Мы ответим вам в ближайшее время!")
-
-# async def faq_handler(message: Message, state: FSMContext):
-#     """Обработчик обычного текста для FAQ"""
-#     # Игнорируем системные кнопки, обрабатываются другими хендлерами
-#     if message.text in ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]:
-#         return
-#
-#     # Проверяем регистрацию пользователя
-#     if not is_user_registered(message.from_user.id):
-#         await message.answer("❌ Сначала пройдите регистрацию!", reply_markup=CONTACT_KB)
-#         return
-#
-#     user_question = message.text.strip()
-#     faq_questions = get_all_faq_questions()
-#
-#     if not faq_questions:
-#         await message.answer("⚠️ База знаний пуста. Ожидайте ответа от оператора.")
-#         return
-#
-#     # ===============================
-#     # Основной вызов поиска вопросов
-#     # ===============================
-#     # Теперь threshold и чувствительность всех методов управленияются из nlp_utils.py
-#     similar = find_similar_questions(user_question, faq_questions)
-#
-#     if similar:
-#         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-#         for item in similar:
-#             # Если каждый элемент — словарь с ключами 'question' и 'score'
-#             q = item['question']
-#             question_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
-#             keyboard.inline_keyboard.append(
-#                 [InlineKeyboardButton(text=q[:64], callback_data=f"faq:{question_hash}")]
-#             )
-#         await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
-#
-#     else:
-#         # Если ничего не найдено, сохраняем вопрос и логируем для ручной обработки
-#         insert_faq_question(user_question)
-#         log_unanswered_question(user_question)
-#         await message.answer("📝 Вопрос передан специалистам. Мы ответим вам в ближайшее время!")
+unanswered_map = {}
 #
 async def faq_handler(message: Message, state: FSMContext):
-    """Обработчик обычного текста для FAQ с новым NLP"""
 
-    # Игнорируем служебные кнопки
-    skip_texts = ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]
-    if message.text in skip_texts:
+    # Эти сообщения обрабатываются другими хендлерами
+    if message.text in ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]:
         return
 
-    # Проверка регистрации
     if not is_user_registered(message.from_user.id):
         await message.answer("❌ Сначала пройдите регистрацию!", reply_markup=CONTACT_KB)
         return
@@ -235,32 +163,112 @@ async def faq_handler(message: Message, state: FSMContext):
         await message.answer("⚠️ База знаний пуста. Ожидайте ответа от оператора.")
         return
 
-    # Получаем похожие вопросы
     similar = find_similar_questions(user_question, faq_questions)
-    # similar = [(question, avg_score, methods_count), ...]
 
     if similar:
-        # Сортируем по средней оценке
-        similar.sort(key=lambda x: x[1], reverse=True)
+        # сортируем по средней оценке (desc)
+        similar = sorted(similar, key=lambda x: x[1], reverse=True)
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
         for item in similar:
-            q = item[0]            # вопрос
-            avg_score = item[1]    # средняя оценка
-            methods_count = item[2]# число методов, которые нашли совпадение
+            q = item[0]
+            avg = item[1] if len(item) > 1 else 0.0
+            count = item[2] if len(item) > 2 else 1
+            display_text = q[:35] + ("..." if len(q) > 35 else "")
+            score_text = f" (🔎={avg:.2f}|⚙={count})"
+            btn_text = f"{display_text}{score_text}"
 
-            question_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
+            q_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
             keyboard.inline_keyboard.append(
-                [InlineKeyboardButton(text=f"{q[:64]} ({avg_score:.2f})", callback_data=f"faq:{question_hash}")]
+                [InlineKeyboardButton(text=btn_text, callback_data=f"faq:{q_hash}")]
             )
 
-        await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
+        keyboard.inline_keyboard.append(
+            [InlineKeyboardButton(text="🔴Нет ответа на мой вопрос🔴", callback_data="unanswered:add")]
+        )
+        bot_msg = await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
+        unanswered_map[(bot_msg.chat.id, bot_msg.message_id)] = user_question
+
     else:
-        # Сохраняем в базу для ручной обработки
+        # Если ничего не найдено — сохраняем и уведомляем (как раньше)
         insert_faq_question(user_question)
         log_unanswered_question(user_question)
         await message.answer("📝 Вопрос передан специалистам. Мы ответим вам в ближайшее время!")
 
+async def handle_unanswered(callback: CallbackQuery):
+    """
+    Callback на кнопку 'Нет ответа на мой вопрос'.
+    Добавляет исходный вопрос в таблицу unanswered_questions и в FAQ-заглушки.
+    """
+    try:
+        key = (callback.message.chat.id, callback.message.message_id)
+        user_q = unanswered_map.pop(key, None)  # берем и удаляем из временного кэша
+
+        if not user_q:
+            # если не удалось найти исходный вопрос — реагируем мягко
+            await callback.answer("Вопрос добавлен. (оригинал не найден в кеше)", show_alert=True)
+            # Для надёжности можно просто взять текст из сообщения, но обычно он там не хранится.
+            return
+
+        # 1) добавляем в таблицу вопросов (если нужно)
+        insert_faq_question(user_q)
+        # 2) логируем как неотвеченный (для операторов)
+        log_unanswered_question(user_q)
+
+        # уведомляем пользователя (показываем всплывающее окно и отправляем текст в чат)
+        await callback.answer("📝 Ваш вопрос добавлен в список для оператора. Спасибо!", show_alert=True)
+        await callback.message.reply("Вопрос добавлен в очередь оператору. Мы уведомим вас, когда ответим.")
+    except Exception as e:
+        logging.exception("Ошибка в handle_unanswered:")
+        # подтверждаем пользователю что произошла ошибка
+        await callback.answer("Ошибка при добавлении вопроса. Попробуйте ещё раз.", show_alert=True)
+
+# async def faq_handler(message: Message, state: FSMContext):
+#     """Обработчик обычного текста для FAQ с новым NLP"""
+#
+#     # Игнорируем служебные кнопки
+#     skip_texts = ["❓ HELP", "📋 MENU", "📥 Выгрузка FAQ", "📖 Инструкция", "🎫 Создать задачу", "◀️ Назад"]
+#     if message.text in skip_texts:
+#         return
+#
+#     # Проверка регистрации
+#     if not is_user_registered(message.from_user.id):
+#         await message.answer("❌ Сначала пройдите регистрацию!", reply_markup=CONTACT_KB)
+#         return
+#
+#     user_question = message.text.strip()
+#     faq_questions = get_all_faq_questions()
+#
+#     if not faq_questions:
+#         await message.answer("⚠️ База знаний пуста. Ожидайте ответа от оператора.")
+#         return
+#
+#     # Получаем похожие вопросы
+#     similar = find_similar_questions(user_question, faq_questions)
+#     # similar = [(question, avg_score, methods_count), ...]
+#
+#     if similar:
+#         # Сортируем по средней оценке
+#         similar.sort(key=lambda x: x[1], reverse=True)
+#
+#         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+#         for item in similar:
+#             q = item[0]            # вопрос
+#             avg_score = item[1]    # средняя оценка
+#             methods_count = item[2]# число методов, которые нашли совпадение
+#
+#             question_hash = hashlib.sha256(q.encode()).hexdigest()[:16]
+#             keyboard.inline_keyboard.append(
+#                 [InlineKeyboardButton(text=f"{q[:64]} ({avg_score:.2f})", callback_data=f"faq:{question_hash}")]
+#             )
+#
+#         await message.answer("🔍 Возможно, вы имели в виду:", reply_markup=keyboard)
+#     else:
+#         # Сохраняем в базу для ручной обработки
+#         insert_faq_question(user_question)
+#         log_unanswered_question(user_question)
+#         await message.answer("📝 Вопрос передан специалистам. Мы ответим вам в ближайшее время!")
+#
 
 
 async def process_faq_choice(callback: CallbackQuery):
@@ -288,7 +296,7 @@ async def inline_menu_handler(callback: CallbackQuery):
             await callback.message.answer("📥 **Выгрузка FAQ** в разработке...")
 
         elif action == "instruction":
-            await callback.message.answer("📖 **Инструкция по использованию** в разработке...")
+            await callback.message.answer(INSTRUCTION_TEXT)
 
         elif action == "ticket":
             await callback.message.answer("🎫 **Создание задачи** в разработке...")
@@ -298,7 +306,7 @@ async def inline_menu_handler(callback: CallbackQuery):
 
         elif action == "main":
             await callback.message.edit_text(
-                "🏠 **Главное меню**",
+                "🏠 **Профиль пользователя**",
                 reply_markup=get_main_menu_keyboard()
             )
 
@@ -313,32 +321,22 @@ async def inline_menu_handler(callback: CallbackQuery):
 # ====================
 
 async def register_handlers(dp: Dispatcher):
-    # Команды
     dp.message.register(cmd_start, Command("start"))
     dp.message.register(cmd_start, F.text == "/start")
-
-    # Обработка кнопок меню
     dp.message.register(handle_faq, F.text == "Выгрузка FAQ")
     dp.message.register(handle_instruction, F.text == "Инструкция")
     dp.message.register(handle_create_task, F.text == "Создать задачу")
-    dp.message.register(handle_main_menu, F.text == "Главное меню")
+    dp.message.register(handle_main_menu, F.text == "Профиль пользователя")
     dp.message.register(contact_handler, F.contact)
-
-    # FSM регистрации
     dp.message.register(process_name, StateFilter(RegistrationStates.waiting_for_name))
     dp.message.register(process_phone, StateFilter(RegistrationStates.waiting_for_phone))
-
-    # Основные кнопки
     dp.message.register(help_handler, F.text == "❓ HELP")
     dp.message.register(menu_handler, F.text == "📋 MENU")
     dp.message.register(back_to_main_menu, F.text == "◀️ Назад")
     dp.message.register(export_faq_handler, F.text == "📥 Выгрузка FAQ")
     dp.message.register(handle_instruction, F.text == "📖 Инструкция")
     dp.message.register(create_ticket_handler, F.text == "🎫 Создать задачу")
-
-    # FAQ обработка обычного текста
     dp.message.register(faq_handler, F.text)
-
-    # Inline обработчики
     dp.callback_query.register(process_faq_choice, F.data.startswith("faq:"))
     dp.callback_query.register(inline_menu_handler, F.data.startswith("menu:"))
+    dp.callback_query.register(handle_unanswered, F.data == "unanswered:add")

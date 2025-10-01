@@ -11,7 +11,7 @@ MAIN_KB = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text="Создать задачу"),
-            KeyboardButton(text="Главное меню")
+            KeyboardButton(text="Профиль пользователя")
         ]
     ],
     resize_keyboard=True,   # кнопки подгоняются под ширину
@@ -32,6 +32,6 @@ def get_main_menu_keyboard():
             InlineKeyboardButton(text="❓ Помощь", callback_data="menu:help")
         ],
         [
-            InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu:main")
+            InlineKeyboardButton(text="🏠 Профиль пользователя", callback_data="menu:main")
         ]
     ])
